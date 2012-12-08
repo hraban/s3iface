@@ -1,7 +1,7 @@
 // Interfaces for objects that can model Amazon S3. Simplifies testing code
 // that depends on S3 without needing a connection to AWS. Written to
 // supplement the standard S3 package, "launchpad.net/goamz/s3".
-package s3interface
+package s3iface
 
 import (
 	"errors"
