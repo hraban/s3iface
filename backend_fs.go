@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"syscall"
 	"time"
 
 	goamzs3 "launchpad.net/goamz/s3"
@@ -16,8 +17,39 @@ import (
 
 type fsbucket string
 
+func parentDirName(path string) string {
+	for path[len(path)-1] == '/' {
+		path = path[:len(path)-1]
+	}
+	idx := strings.LastIndex(path, "/")
+	if idx == -1 {
+		return ""
+	}
+	return path[:idx]
+}
+
+// Delete this directory if it is empty, and continue with its parent, etc
+func purgeEmptyDirs(dir fsbucket, path string) error {
+	if path == "" {
+		return nil
+	}
+	err := os.Remove(string(dir) + path)
+	if err != nil {
+		ferr := err.(*os.PathError)
+		if ferr.Err == syscall.ENOTEMPTY {
+			err = nil
+		}
+		return err
+	}
+	return purgeEmptyDirs(dir, parentDirName(path))
+}
+
 func (dir fsbucket) Del(path string) error {
-	return os.Remove(string(dir) + path)
+	err := os.Remove(string(dir) + path)
+	if err != nil {
+		return err
+	}
+	return purgeEmptyDirs(dir, parentDirName(path))
 }
 
 func (dir fsbucket) DelBucket() error {
