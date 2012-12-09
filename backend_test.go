@@ -7,12 +7,12 @@ import (
 	goamzs3 "launchpad.net/goamz/s3"
 )
 
-func testBucket(b Bucket, errs chan<- error) {
+func testBucketSimple(b Bucket, errs chan<- error) {
 	var err error
 	var testname string
 	defer func() {
 		if err != nil {
-			errs <- fmt.Errorf("Failed bucket test %q: %v", testname, err)
+			errs <- fmt.Errorf("Failed bucket test (simple) %q: %v", testname, err)
 		}
 	}()
 	testname = "Put test.txt"
@@ -31,6 +31,33 @@ func testBucket(b Bucket, errs chan<- error) {
 	}
 	testname = "Del test.txt"
 	err = b.Del("test.txt")
+	return
+}
+
+func testBucketNested(b Bucket, errs chan<- error) {
+	var err error
+	var testname string
+	defer func() {
+		if err != nil {
+			errs <- fmt.Errorf("Failed bucket test (nested) %q: %v", testname, err)
+		}
+	}()
+	testname = "Put a/b/test.txt"
+	err = b.Put("a/b/test.txt", []byte("Hello!"), "text/plain", goamzs3.Private)
+	if err != nil {
+		return
+	}
+	testname = "Get a/b/test.txt"
+	data, err := b.Get("a/b/test.txt")
+	if err != nil {
+		return
+	}
+	if string(data) != "Hello!" {
+		err = fmt.Errorf("Got wrong test data back: %q", data)
+		return
+	}
+	testname = "Del a/b/test.txt"
+	err = b.Del("a/b/test.txt")
 	return
 }
 
@@ -58,7 +85,8 @@ func runS3tests(s3 S3, errs chan<- error) {
 	}
 	// Try to clean up, do not care if it fails
 	defer purgeBucket(b, errs)
-	testBucket(b, errs)
+	testBucketSimple(b, errs)
+	testBucketNested(b, errs)
 	return
 }
 
