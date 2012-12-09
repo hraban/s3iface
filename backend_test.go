@@ -57,7 +57,7 @@ func runS3tests(s3 S3, errs chan<- error) {
 		errs <- fmt.Errorf("Failed to create test bucket: %v", err)
 	}
 	// Try to clean up, do not care if it fails
-	//defer purgeBucket(b, errs)
+	defer purgeBucket(b, errs)
 	testBucket(b, errs)
 	return
 }
