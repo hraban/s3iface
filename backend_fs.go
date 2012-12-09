@@ -4,6 +4,7 @@ package s3iface
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -38,7 +39,14 @@ func (dir fsbucket) List(prefix, delim, marker string, max int) (result *goamzs3
 
 // Content-type and permissions are ignored.
 func (dir fsbucket) Put(path string, data []byte, contType string, perm goamzs3.ACL) error {
-	return ioutil.WriteFile(string(dir)+path, data, 0600)
+	fullpath := string(dir) + path
+	if i := strings.LastIndex(path, "/"); 0 <= i {
+		err := os.MkdirAll(string(dir)+path[:i], 0700)
+		if err != nil {
+			return fmt.Errorf("Error creating parent dirs: %v", path, err)
+		}
+	}
+	return ioutil.WriteFile(fullpath, data, 0600)
 }
 
 // Permissions are ignored
