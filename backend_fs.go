@@ -15,10 +15,13 @@ import (
 	goamzs3 "launchpad.net/goamz/s3"
 )
 
-type fsbucket string
+type fsbucket struct {
+	s3dir fs3
+	name  string
+}
 
 func (b fsbucket) root() string {
-	return string(b)
+	return string(b.s3dir) + b.name + "/"
 }
 
 func (b fsbucket) full(path string) string {
@@ -174,16 +177,16 @@ func (b fsbucket) URL(path string) string {
 type fs3 string
 
 func (dir fs3) Bucket(name string) Bucket {
-	if !strings.HasSuffix(name, "/") {
-		name = name + "/"
+	if name[len(name)-1] == '/' {
+		name = name[:len(name)-1]
 	}
-	return fsbucket(string(dir) + name)
+	return fsbucket{dir, name}
 }
 
 // Use a directory as an S3 store. As (un)safe for concurrent use as the
 // underlying filesystem.
 func WrapFS(dir string) S3 {
-	if !strings.HasSuffix(string(dir), "/") {
+	if dir[len(dir)-1] != '/' {
 		dir = dir + "/"
 	}
 	return fs3(dir)
