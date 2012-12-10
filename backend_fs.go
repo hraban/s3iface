@@ -64,8 +64,64 @@ func (dir fsbucket) GetReader(path string) (rc io.ReadCloser, err error) {
 	return os.Open(string(dir) + path)
 }
 
+func fi2key(fi os.FileInfo) goamzs3.Key {
+	return goamzs3.Key{
+		Key:          fi.Name(),
+		LastModified: fi.ModTime().UTC().Format(time.RFC3339Nano),
+		Size:         fi.Size(),
+	}
+}
+
 func (dir fsbucket) List(prefix, delim, marker string, max int) (result *goamzs3.ListResp, err error) {
-	err = errors.New("Listing bucket contents in FS wrapper not implemented yet")
+	if marker != "" {
+		err = errors.New("FS backend does not support a start marker")
+		return
+	}
+	if delim != "/" {
+		err = errors.New("FS backend requires a `/' delimiter")
+		return
+	}
+	if prefix != "" && prefix[len(prefix)-1] != '/' {
+		err = errors.New("FS backend only supports prefixes ending in `/'")
+		return
+	}
+	d, err := os.Open(string(dir) + prefix)
+	if err != nil {
+		err = fmt.Errorf("Opening directory to list contents failed: %v", err)
+		return
+	}
+	ls, err := d.Readdir(max)
+	var hasmore bool
+	switch err {
+	case nil:
+		hasmore = true
+		break
+	case io.EOF:
+		hasmore = false
+		break
+	default:
+		err = fmt.Errorf("Listing contents of directory failed: %v", err)
+		return
+	}
+	files := make([]goamzs3.Key, 0, len(ls))
+	dirs := make([]string, 0, len(ls))
+	for _, fi := range ls {
+		if fi.IsDir() {
+			dirs = append(dirs, fi.Name()+"/")
+		} else {
+			files = append(files, fi2key(fi))
+		}
+	}
+	result = &goamzs3.ListResp{
+		// TODO: bucket name
+		Prefix:         prefix,
+		Delimiter:      delim,
+		MaxKeys:        max,
+		Marker:         marker,
+		IsTruncated:    hasmore,
+		Contents:       files,
+		CommonPrefixes: dirs,
+	}
 	return
 }
 
