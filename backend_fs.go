@@ -124,7 +124,7 @@ func (b fsbucket) List(prefix, delim, marker string, max int) (result *goamzs3.L
 		}
 	}
 	result = &goamzs3.ListResp{
-		// TODO: bucket name
+		Name:           b.name,
 		Prefix:         prefix,
 		Delimiter:      delim,
 		MaxKeys:        max,
