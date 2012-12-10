@@ -20,6 +20,15 @@ func testBucketSimple(b Bucket, errs chan<- error) {
 	if err != nil {
 		return
 	}
+	testname = "List objects"
+	ls, err := b.List("", "/", "", 0)
+	if err != nil {
+		return
+	}
+	if len(ls.Contents) != 1 || ls.Contents[0].Key != "test.txt" {
+		err = fmt.Errorf("Unexpected contents: %+v", ls.Contents)
+		return
+	}
 	testname = "Get test.txt"
 	data, err := b.Get("test.txt")
 	if err != nil {
