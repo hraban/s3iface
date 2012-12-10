@@ -17,6 +17,14 @@ import (
 
 type fsbucket string
 
+func (b fsbucket) root() string {
+	return string(b)
+}
+
+func (b fsbucket) full(path string) string {
+	return b.root() + path
+}
+
 func parentDirName(path string) string {
 	for path[len(path)-1] == '/' {
 		path = path[:len(path)-1]
@@ -29,11 +37,11 @@ func parentDirName(path string) string {
 }
 
 // Delete this directory if it is empty, and continue with its parent, etc
-func purgeEmptyDirs(dir fsbucket, path string) error {
+func purgeEmptyDirs(b fsbucket, path string) error {
 	if path == "" {
 		return nil
 	}
-	err := os.Remove(string(dir) + path)
+	err := os.Remove(b.full(path))
 	if err != nil {
 		ferr := err.(*os.PathError)
 		if ferr.Err == syscall.ENOTEMPTY {
@@ -41,27 +49,27 @@ func purgeEmptyDirs(dir fsbucket, path string) error {
 		}
 		return err
 	}
-	return purgeEmptyDirs(dir, parentDirName(path))
+	return purgeEmptyDirs(b, parentDirName(path))
 }
 
-func (dir fsbucket) Del(path string) error {
-	err := os.Remove(string(dir) + path)
+func (b fsbucket) Del(path string) error {
+	err := os.Remove(b.full(path))
 	if err != nil {
 		return err
 	}
-	return purgeEmptyDirs(dir, parentDirName(path))
+	return purgeEmptyDirs(b, parentDirName(path))
 }
 
-func (dir fsbucket) DelBucket() error {
-	return os.Remove(string(dir))
+func (b fsbucket) DelBucket() error {
+	return os.Remove(b.root())
 }
 
-func (dir fsbucket) Get(path string) ([]byte, error) {
-	return ioutil.ReadFile(string(dir) + path)
+func (b fsbucket) Get(path string) ([]byte, error) {
+	return ioutil.ReadFile(b.full(path))
 }
 
-func (dir fsbucket) GetReader(path string) (rc io.ReadCloser, err error) {
-	return os.Open(string(dir) + path)
+func (b fsbucket) GetReader(path string) (rc io.ReadCloser, err error) {
+	return os.Open(b.full(path))
 }
 
 func fi2key(fi os.FileInfo) goamzs3.Key {
@@ -72,7 +80,7 @@ func fi2key(fi os.FileInfo) goamzs3.Key {
 	}
 }
 
-func (dir fsbucket) List(prefix, delim, marker string, max int) (result *goamzs3.ListResp, err error) {
+func (b fsbucket) List(prefix, delim, marker string, max int) (result *goamzs3.ListResp, err error) {
 	if marker != "" {
 		err = errors.New("FS backend does not support a start marker")
 		return
@@ -85,7 +93,7 @@ func (dir fsbucket) List(prefix, delim, marker string, max int) (result *goamzs3
 		err = errors.New("FS backend only supports prefixes ending in `/'")
 		return
 	}
-	d, err := os.Open(string(dir) + prefix)
+	d, err := os.Open(b.full(prefix))
 	if err != nil {
 		err = fmt.Errorf("Opening directory to list contents failed: %v", err)
 		return
@@ -126,10 +134,10 @@ func (dir fsbucket) List(prefix, delim, marker string, max int) (result *goamzs3
 }
 
 // Content-type and permissions are ignored.
-func (dir fsbucket) Put(path string, data []byte, contType string, perm goamzs3.ACL) error {
-	fullpath := string(dir) + path
+func (b fsbucket) Put(path string, data []byte, contType string, perm goamzs3.ACL) error {
+	fullpath := b.full(path)
 	if i := strings.LastIndex(path, "/"); 0 <= i {
-		err := os.MkdirAll(string(dir)+path[:i], 0700)
+		err := os.MkdirAll(b.full(path[:i]), 0700)
 		if err != nil {
 			return fmt.Errorf("Error creating parent dirs: %v", path, err)
 		}
@@ -138,13 +146,13 @@ func (dir fsbucket) Put(path string, data []byte, contType string, perm goamzs3.
 }
 
 // Permissions are ignored
-func (dir fsbucket) PutBucket(perm goamzs3.ACL) error {
-	return os.Mkdir(string(dir), 0700)
+func (b fsbucket) PutBucket(perm goamzs3.ACL) error {
+	return os.Mkdir(b.root(), 0700)
 }
 
 // Content-type and permissions are ignored
-func (dir fsbucket) PutReader(path string, r io.Reader, length int64, contType string, perm goamzs3.ACL) error {
-	f, err := os.Create(string(dir) + path)
+func (b fsbucket) PutReader(path string, r io.Reader, length int64, contType string, perm goamzs3.ACL) error {
+	f, err := os.Create(b.full(path))
 	if err != nil {
 		return err
 	}
@@ -155,12 +163,12 @@ func (dir fsbucket) PutReader(path string, r io.Reader, length int64, contType s
 }
 
 // Not implemented in FS wrapper
-func (dir fsbucket) SignedURL(path string, expires time.Time) string {
-	return string(dir) + path
+func (b fsbucket) SignedURL(path string, expires time.Time) string {
+	return b.full(path)
 }
 
-func (dir fsbucket) URL(path string) string {
-	return string(dir) + path
+func (b fsbucket) URL(path string) string {
+	return b.full(path)
 }
 
 type fs3 string
