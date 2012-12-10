@@ -96,23 +96,27 @@ func (b fsbucket) List(prefix, delim, marker string, max int) (result *goamzs3.L
 		err = errors.New("FS backend only supports prefixes ending in `/'")
 		return
 	}
+	var ls []os.FileInfo
+	hasmore := false
 	d, err := os.Open(b.full(prefix))
 	if err != nil {
-		err = fmt.Errorf("Opening directory to list contents failed: %v", err)
-		return
-	}
-	ls, err := d.Readdir(max)
-	var hasmore bool
-	switch err {
-	case nil:
-		hasmore = true
-		break
-	case io.EOF:
-		hasmore = false
-		break
-	default:
-		err = fmt.Errorf("Listing contents of directory failed: %v", err)
-		return
+		// Treat directories that do not exist as if they have no contents
+		if err.(*os.PathError).Err != syscall.ENOENT {
+			err = fmt.Errorf("Opening directory to list contents failed: %v", err)
+			return
+		}
+	} else {
+		ls, err = d.Readdir(max)
+		switch err {
+		case nil:
+			hasmore = true
+			break
+		case io.EOF:
+			break
+		default:
+			err = fmt.Errorf("Listing contents of directory failed: %v", err)
+			return
+		}
 	}
 	files := make([]goamzs3.Key, 0, len(ls))
 	dirs := make([]string, 0, len(ls))
