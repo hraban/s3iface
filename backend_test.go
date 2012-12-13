@@ -27,12 +27,12 @@ import (
 	goamzs3 "launchpad.net/goamz/s3"
 )
 
-func testBucketSimple(b Bucket, errs chan<- error) {
-	var err error
+func testBucketSimple(b Bucket) (err error) {
 	var testname string
 	defer func() {
 		if err != nil {
-			errs <- fmt.Errorf("Failed bucket test (simple) %q: %v", testname, err)
+			err = fmt.Errorf("Failed bucket test (simple) %q: %v", testname, err)
+			return
 		}
 	}()
 	testname = "Put test.txt"
@@ -63,12 +63,12 @@ func testBucketSimple(b Bucket, errs chan<- error) {
 	return
 }
 
-func testBucketNested(b Bucket, errs chan<- error) {
-	var err error
+func testBucketNested(b Bucket) (err error) {
 	var testname string
 	defer func() {
 		if err != nil {
-			errs <- fmt.Errorf("Failed bucket test (nested) %q: %v", testname, err)
+			err = fmt.Errorf("Failed bucket test (nested) %q: %v", testname, err)
+			return
 		}
 	}()
 	testname = "Put nested objects"
@@ -112,43 +112,40 @@ func testBucketNested(b Bucket, errs chan<- error) {
 }
 
 // Delete the bucket completely (think rm -rf ...)
-func purgeBucket(b Bucket, errs chan<- error) {
-	defer func() {
-		errs <- b.DelBucket()
-	}()
+func purgeBucket(b Bucket) error {
 	ls, err := b.List("", "", "", 0)
 	if err != nil {
-		errs <- fmt.Errorf("Failed to list bucket for cleanup: %v", err)
-		return
+		return fmt.Errorf("Failed to list bucket for cleanup: %v", err)
 	}
 	for _, key := range ls.Contents {
-		errs <- b.Del(key.Key)
+		err = b.Del(key.Key)
+		if err != nil {
+			return err
+		}
 	}
-	return
+	return b.DelBucket()
 }
 
-func runS3tests(s3 S3, errs chan<- error) {
+func runS3tests(s3 S3) error {
 	b := s3.Bucket("test")
 	err := b.PutBucket(goamzs3.Private)
 	if err != nil {
-		errs <- fmt.Errorf("Failed to create test bucket: %v", err)
+		return fmt.Errorf("Failed to create test bucket: %v", err)
 	}
-	// Try to clean up, do not care if it fails
-	defer purgeBucket(b, errs)
-	testBucketSimple(b, errs)
-	testBucketNested(b, errs)
-	return
+	err = testBucketSimple(b)
+	if err != nil {
+		return err
+	}
+	err = testBucketNested(b)
+	if err != nil {
+		return err
+	}
+	return purgeBucket(b)
 }
 
 func testS3backend(backend S3, t *testing.T) {
-	errs := make(chan error)
-	go func() {
-		runS3tests(backend, errs)
-		close(errs)
-	}()
-	for err := range errs {
-		if err != nil {
-			t.Error("S3 backend:", err)
-		}
+	err := runS3tests(backend)
+	if err != nil {
+		t.Error("S3 backend:", err)
 	}
 }
