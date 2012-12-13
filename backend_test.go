@@ -71,9 +71,30 @@ func testBucketNested(b Bucket, errs chan<- error) {
 			errs <- fmt.Errorf("Failed bucket test (nested) %q: %v", testname, err)
 		}
 	}()
-	testname = "Put a/b/test.txt"
+	testname = "Put nested objects"
 	err = b.Put("a/b/test.txt", []byte("Hello!"), "text/plain", goamzs3.Private)
 	if err != nil {
+		return
+	}
+	err = b.Put("a/foo/bar.txt", []byte("NananananaBATMAN!"), "text/plain", goamzs3.Private)
+	if err != nil {
+		return
+	}
+	err = b.Put("a/imina", []byte("nobodylikesq"), "text/plain", goamzs3.Private)
+	if err != nil {
+		return
+	}
+	testname = "List objects"
+	ls, err := b.List("a/", "/", "", 0)
+	if err != nil {
+		return
+	}
+	if len(ls.Contents) != 1 || ls.Contents[0].Key != "a/imina" {
+		err = fmt.Errorf("Unexpected contents: %+v", ls.Contents)
+		return
+	}
+	if len(ls.CommonPrefixes) != 2 || ls.CommonPrefixes[0] != "a/b/" || ls.CommonPrefixes[1] != "a/foo/" {
+		err = fmt.Errorf("Unexpected common prefixes: %+v", ls.CommonPrefixes)
 		return
 	}
 	testname = "Get a/b/test.txt"
