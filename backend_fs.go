@@ -95,9 +95,9 @@ func (b fsbucket) GetReader(path string) (rc io.ReadCloser, err error) {
 	return os.Open(b.full(path))
 }
 
-func fi2key(fi os.FileInfo) goamzs3.Key {
+func fi2key(fi os.FileInfo, prefix string) goamzs3.Key {
 	return goamzs3.Key{
-		Key:          fi.Name(),
+		Key:          prefix + fi.Name(),
 		LastModified: fi.ModTime().UTC().Format(time.RFC3339Nano),
 		Size:         fi.Size(),
 	}
@@ -142,9 +142,9 @@ func (b fsbucket) List(prefix, delim, marker string, max int) (result *goamzs3.L
 	dirs := make([]string, 0, len(ls))
 	for _, fi := range ls {
 		if fi.IsDir() {
-			dirs = append(dirs, fi.Name()+"/")
+			dirs = append(dirs, prefix+fi.Name()+"/")
 		} else {
-			files = append(files, fi2key(fi))
+			files = append(files, fi2key(fi, prefix))
 		}
 	}
 	result = &goamzs3.ListResp{
